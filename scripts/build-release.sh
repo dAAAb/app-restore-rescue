@@ -59,7 +59,7 @@ swift scripts/make-icon.swift "$project_root/.build/AppIcon.iconset"
 # Ad-hoc signature provides bundle integrity only; it is not a Developer ID identity.
 /usr/bin/codesign --force --sign - --timestamp=none "$app"
 /usr/bin/codesign --verify --strict --verbose=2 "$app"
-/usr/bin/lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/AppRestoreRescue"
+/usr/bin/lipo "$app/Contents/MacOS/AppRestoreRescue" -verify_arch arm64 x86_64
 
 cp README.md README.zh-TW.md LICENSE PRIVACY.md "$stage/"
 commit="${GITHUB_SHA:-local-build}"
