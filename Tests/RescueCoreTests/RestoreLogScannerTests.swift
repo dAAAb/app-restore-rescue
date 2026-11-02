@@ -96,6 +96,11 @@ final class RestoreLogScannerTests: XCTestCase {
         XCTAssertEqual(RestoreLogScanner.scan(log).candidates.first?.bundle.rawValue, "com.example.reader")
     }
 
+    func testLiveLogProcessImageSuffix() {
+        let log = "Nov  2 12:00:00 appstored(StoreFoundation)[100] <Notice>: \(start("A1B2C3D4", "com.example.reader"))\nNov  2 12:00:01 appstored(StoreFoundation)[100] <Notice>: \(end("A1B2C3D4"))"
+        XCTAssertEqual(RestoreLogScanner.scan(log).candidates.first?.bundle.rawValue, "com.example.reader")
+    }
+
     func testNoFailureDoesNotInventCandidate() {
         XCTAssertTrue(RestoreLogScanner.scan(line("12:00:00", start("A1B2C3D4", "com.example.reader"))).candidates.isEmpty)
     }

@@ -14,7 +14,7 @@ public struct DeviceIdentifier: Hashable, Identifiable, Sendable {
     public var masked: String { "iPhone · …" + rawValue.suffix(6) }
 
     public init(_ value: String) throws {
-        guard value.range(of: "^(?:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{16}|[A-Fa-f0-9]{40})$", options: .regularExpression) != nil else {
+        guard value.range(of: "\\A(?:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{16}|[A-Fa-f0-9]{40})\\z", options: .regularExpression) != nil else {
             throw RescueError.invalidDevice
         }
         rawValue = value
@@ -26,7 +26,7 @@ public struct BundleIdentifier: Hashable, Sendable {
 
     public init(_ value: String) throws {
         guard value.utf8.count <= 255,
-              value.range(of: "^[A-Za-z][A-Za-z0-9_-]*(?:\\.[A-Za-z0-9][A-Za-z0-9_-]*)+$", options: .regularExpression) != nil else {
+              value.range(of: "\\A[A-Za-z][A-Za-z0-9_-]*(?:\\.[A-Za-z0-9][A-Za-z0-9_-]*)+\\z", options: .regularExpression) != nil else {
             throw RescueError.invalidBundle
         }
         guard value.lowercased() != "com.apple", !value.lowercased().hasPrefix("com.apple.") else {
@@ -90,12 +90,16 @@ public struct ToolCommand: Sendable {
     public let timeout: TimeInterval
     public let maximumOutputBytes: Int
     public let expectedStop: Bool
-    private init(_ tool: ToolKind, _ arguments: [String], timeout: TimeInterval = 30, maximumOutputBytes: Int = 262_144, expectedStop: Bool = false) {
+    let readinessMarker: String?
+    let readinessHandler: (@Sendable () -> Void)?
+    private init(_ tool: ToolKind, _ arguments: [String], timeout: TimeInterval = 30, maximumOutputBytes: Int = 262_144, expectedStop: Bool = false, readinessMarker: String? = nil, readinessHandler: (@Sendable () -> Void)? = nil) {
         self.tool = tool
         self.arguments = arguments
         self.timeout = timeout
         self.maximumOutputBytes = maximumOutputBytes
         self.expectedStop = expectedStop
+        self.readinessMarker = readinessMarker
+        self.readinessHandler = readinessHandler
     }
     public static var version: ToolCommand { ToolCommand(.installer, ["--version"], timeout: 10) }
     public static var devices: ToolCommand { ToolCommand(.deviceList, ["-l"], timeout: 15) }
@@ -109,8 +113,9 @@ public struct ToolCommand: Sendable {
         guard url.isFileURL, url.pathExtension.lowercased() == "logarchive" else { throw RescueError.unsupportedLog }
         return ToolCommand(.systemLog, ["show", "--archive", url.path, "--style", "ndjson", "--info", "--debug", "--predicate", "process == 'appstored' AND (eventMessage CONTAINS 'PurchaseService' OR eventMessage CONTAINS 'Duplicate restoring request')"], timeout: 60, maximumOutputBytes: 8_388_608)
     }
-    public static func monitor(_ device: DeviceIdentifier) -> ToolCommand {
-        ToolCommand(.liveLog, ["-u", device.rawValue, "-x", "--no-colors", "-p", "appstored"], timeout: 60, maximumOutputBytes: 16_777_216, expectedStop: true)
+    public static func monitor(_ device: DeviceIdentifier, onReady: (@Sendable () -> Void)? = nil) -> ToolCommand {
+        ToolCommand(.liveLog, ["-u", device.rawValue, "-x", "--no-colors", "-p", "appstored"], timeout: 60, maximumOutputBytes: 16_777_216, expectedStop: true,
+                    readinessMarker: "[connected:\(device.rawValue)]", readinessHandler: onReady)
     }
 }
 
@@ -119,11 +124,13 @@ public struct CommandResult: Sendable {
     public let stdout: String
     public let stderr: String
     public let stoppedAsRequested: Bool
-    public init(exitCode: Int32, stdout: String, stderr: String = "", stoppedAsRequested: Bool = false) {
+    public let monitoringStarted: Bool
+    public init(exitCode: Int32, stdout: String, stderr: String = "", stoppedAsRequested: Bool = false, monitoringStarted: Bool = false) {
         self.exitCode = exitCode
         self.stdout = stdout
         self.stderr = stderr
         self.stoppedAsRequested = stoppedAsRequested
+        self.monitoringStarted = monitoringStarted
     }
     public var uninstallCompleted: Bool {
         exitCode == 0 && stdout.components(separatedBy: .newlines).contains {

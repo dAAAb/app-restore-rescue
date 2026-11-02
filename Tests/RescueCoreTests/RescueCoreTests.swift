@@ -11,7 +11,7 @@ final class RescueCoreTests: XCTestCase {
 
     func testBundleValidationRejectsSystemAppsOptionsWildcardsAndInjection() throws {
         XCTAssertEqual(try BundleIdentifier("com.atebits.Tweetie2").rawValue, "com.atebits.Tweetie2")
-        for value in ["*", "com.example.*", "--all", "com.example;whoami", "com.example\nreader", "com..reader", "com.apple", "com.apple.AppStore", "COM.APPLE.mobilemail", "com.example reader"] {
+        for value in ["*", "com.example.*", "--all", "com.example;whoami", "com.example\nreader", "com.example.reader\n", "com.example.reader\r\n", "com..reader", "com.apple", "com.apple.AppStore", "COM.APPLE.mobilemail", "com.example reader"] {
             XCTAssertThrowsError(try BundleIdentifier(value), value)
         }
     }
@@ -148,6 +148,45 @@ final class RescueCoreTests: XCTestCase {
         XCTAssertFalse(summary.contains(bundle.rawValue))
         XCTAssertFalse(summary.contains("/Users/"))
         XCTAssertTrue(summary.contains("Matched candidates: 2"))
+    }
+
+    func testReadinessRequiresExactDeviceBannerAcrossChunks() {
+        var detector = MonitorReadinessDetector(marker: "[connected:\(deviceA.rawValue)]")
+        XCTAssertFalse(detector.append(Data("[connected:\(deviceB.rawValue)]\n".utf8)))
+        XCTAssertFalse(detector.append(Data("copied [connected:\(deviceA.rawValue)]\n".utf8)))
+        XCTAssertFalse(detector.append(Data("[connec".utf8)))
+        XCTAssertTrue(detector.append(Data("ted:\(deviceA.rawValue)]\n".utf8)))
+        XCTAssertTrue(detector.ready)
+        XCTAssertFalse(detector.append(Data("[connected:\(deviceA.rawValue)]\n".utf8)))
+    }
+
+    func testMonitoringWithoutConnectedBannerDoesNotClaimSuccessfulScan() async throws {
+        let runner = MockRunner([
+            .result(CommandResult(exitCode: 0, stdout: "ideviceinstaller 1.2.0")),
+            .result(CommandResult(exitCode: 0, stdout: deviceA.rawValue)),
+            .result(CommandResult(exitCode: 15, stdout: "", stoppedAsRequested: true, monitoringStarted: false))
+        ])
+        let service = RescueService(runner: runner)
+        do { _ = try await service.monitor(deviceA); XCTFail() }
+        catch { XCTAssertEqual(error as? RescueError, .serviceUnavailable) }
+    }
+
+    func testShutdownTerminatesOwnedChildAndPreventsNewLaunch() async throws {
+        // Harmless local fixture. No USB tool or device is involved.
+        let registry = OwnedProcessRegistry()
+        let child = Process()
+        child.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        child.arguments = ["30"]
+        let cancellation = ProcessCancellation()
+        try registry.launch(child, cancellation: cancellation)
+        XCTAssertTrue(child.isRunning)
+        await registry.shutdown()
+        XCTAssertFalse(child.isRunning)
+        let another = Process()
+        another.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        another.arguments = ["1"]
+        XCTAssertThrowsError(try registry.launch(another, cancellation: ProcessCancellation()))
+        XCTAssertFalse(another.isRunning)
     }
 }
 

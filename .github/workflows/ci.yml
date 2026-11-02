@@ -28,3 +28,5 @@ jobs:
         run: bash -n scripts/build-release.sh
       - name: Test app core with synthetic data and mock device tools
         run: swift test
+      - name: Verify universal app packaging without publishing
+        run: bash scripts/build-release.sh 0.0.0

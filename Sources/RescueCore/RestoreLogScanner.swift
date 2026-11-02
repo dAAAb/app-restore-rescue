@@ -41,6 +41,7 @@ public enum RestoreLogScanner {
         } else { lines = contents.components(separatedBy: .newlines) }
 
         for line in lines {
+            guard line.contains("PurchaseService") || line.contains("Duplicate restoring request") else { continue }
             guard let event = event(from: line) else { continue }
             if event.isAppStored, let match = captures(startPattern, in: event.message).first,
                let pid = event.processID, let time = event.time,
@@ -94,7 +95,7 @@ public enum RestoreLogScanner {
             ?? captures(#"^([A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?)"#, in: cleaned).first?.first
         let header = stamp.map { String(cleaned.dropFirst($0.count)).trimmingCharacters(in: .whitespaces) } ?? cleaned
         // Only a process in the header counts. An appstored[...] quote inside another process's message does not.
-        let headerPattern = stamp == nil ? #"^appstored\[([0-9]+)(?::[^\]]*)?\]"# : #"^(?:[A-Za-z0-9_.-]+\s+)?appstored\[([0-9]+)(?::[^\]]*)?\]"#
+        let headerPattern = stamp == nil ? #"^appstored(?:\([^\r\n)]*\))?\[([0-9]+)(?::[^\]]*)?\]"# : #"^(?:[A-Za-z0-9_.-]+\s+)?appstored(?:\([^\r\n)]*\))?\[([0-9]+)(?::[^\]]*)?\]"#
         let pid = captures(headerPattern, in: header).first?.first
         return Event(message: cleaned, processID: pid, time: stamp.flatMap(date), isAppStored: pid != nil)
     }

@@ -6,17 +6,30 @@ import RescueCore
 struct AppRestoreRescueApp: App {
     @NSApplicationDelegateAdaptor(ApplicationDelegate.self) private var delegate
     var body: some Scene {
-        WindowGroup { RescueView() }
+        Window("App Restore Rescue", id: "main") { RescueView() }
             .defaultSize(width: 820, height: 880)
     }
 }
 
+@MainActor
 final class ApplicationDelegate: NSObject, NSApplicationDelegate {
+    static var allowTermination: (() -> Bool)?
+    private var terminationPending = false
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !terminationPending else { return .terminateLater }
+        guard Self.allowTermination?() ?? true else { return .terminateCancel }
+        terminationPending = true
+        Task {
+            await LocalProcessRunner.shutdownOwnedProcesses()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
 }
 
 enum Language: String, CaseIterable, Identifiable {
@@ -42,9 +55,11 @@ final class RescueModel: ObservableObject {
     @Published var status: Status = .idle
     private let service = RescueService()
     private var monitoringTask: Task<Void, Never>?
+    private var monitorGeneration = 0
 
     init(isDemo: Bool = CommandLine.arguments.contains("--demo")) {
         self.isDemo = isDemo
+        ApplicationDelegate.allowTermination = { [weak self] in self?.confirmTermination() ?? true }
         if isDemo {
             let device = try! DeviceIdentifier("00000000-0000000000000000")
             devices = [device]
@@ -57,7 +72,7 @@ final class RescueModel: ObservableObject {
     }
 
     enum Status {
-        case idle, ready, checking, inspecting, inspected(Bool), monitoring, scanning, scanned, uninstalling, completed
+        case idle, ready, checking, inspecting, inspected(Bool), connectingMonitor, monitoring, scanning, scanned, uninstalling, completed
         case failed(RescueError)
     }
 
@@ -67,6 +82,18 @@ final class RescueModel: ObservableObject {
         return RescueTarget(device: device, bundle: bundle)
     }
     var canUninstall: Bool { !isDemo && !busy && inspection != nil && inspection?.target == target }
+    var uninstallInProgress: Bool { if case .uninstalling = status { return true }; return false }
+
+    private func confirmTermination() -> Bool {
+        guard uninstallInProgress else { return true }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = text("An uninstall request is still running", "卸載請求仍在執行")
+        alert.informativeText = text("Quitting stops this tool's child process, but cannot undo a request already sent to the phone. The outcome may be unknown. Wait for completion unless you intend to stop observing it.", "離開會停止本工具的子程序，但無法撤回已送達手機的請求，結果可能不確定。建議等待完成後再離開。")
+        alert.addButton(withTitle: text("Wait for completion", "等待完成"))
+        alert.addButton(withTitle: text("Quit anyway", "仍要離開"))
+        return alert.runModal() == .alertSecondButtonReturn
+    }
 
     func invalidateInspection() { inspection = nil; completed = false }
 
@@ -100,10 +127,20 @@ final class RescueModel: ObservableObject {
     func startMonitoring() {
         guard !isDemo else { status = .scanned; return }
         guard let device = selectedDevice, !busy else { return }
-        busy = true; monitoring = true; status = .monitoring; scan = nil
+        busy = true; monitoring = true; status = .connectingMonitor; scan = nil
+        monitorGeneration += 1
+        let generation = monitorGeneration
         monitoringTask = Task {
             defer { busy = false; monitoring = false; monitoringTask = nil }
-            do { scan = try await service.monitor(device); status = .scanned }
+            do {
+                scan = try await service.monitor(device, onReady: { [weak self] in
+                    Task { @MainActor in
+                        guard let self = self, self.monitoring, self.monitorGeneration == generation else { return }
+                        self.status = .monitoring
+                    }
+                })
+                status = .scanned
+            }
             catch { fail(error) }
         }
     }
@@ -162,7 +199,8 @@ final class RescueModel: ObservableObject {
         case .ready: return devices.isEmpty ? text("No USB iPhone found. Unlock your phone, check the cable, then refresh. A restricted execution environment can also block the USB service.", "未找到 USB iPhone。請解鎖手機、確認傳輸線後重新檢查。受限制的執行環境也可能阻擋 USB 服務。") : text("Choose the intended iPhone. No device is selected automatically.", "請選擇要處理的 iPhone。工具不會自動選擇裝置。")
         case .inspecting: return text("Checking only the selected app…", "只檢查選定的 App…")
         case .inspected(let found): return found ? text("An app record exists. That alone does not prove a stuck restore. Uninstalling can delete its local data.", "找到 App 紀錄，但這本身不能證明回復卡住。卸載可能刪除其本機資料。") : text("No app record was returned. A targeted uninstall request can still be submitted, but may be rejected or fail to clear the restore.", "沒有查到 App 紀錄。仍可提出指定卸載請求，但系統可能拒絕，或無法解除回復狀態。")
-        case .monitoring: return text("Monitoring appstored for up to 60 seconds. After the connection starts, tap the affected app’s cloud button ONCE in App Store. Wait for the cloud to return, then stop. That manual retry may install the app if it succeeds.", "最多監看 appstored 60 秒。開始連線後，請在 App Store 按一次該 App 的雲朵。等雲朵再次出現後停止監看。這次手動重試若成功，可能開始安裝 App。")
+        case .connectingMonitor: return text("Connecting to the selected phone’s log service. WAIT for the “Listening” message before pressing the cloud button.", "正在連接選定手機的日誌服務。請等待顯示「已開始監看」，再按雲朵下載按鈕。")
+        case .monitoring: return text("Listening — the phone’s log service is connected. Tap the affected app’s cloud button ONCE in App Store. Wait for the cloud to return, then stop. This manual retry may install the app if it succeeds. Monitoring stops automatically within 60 seconds of launch.", "已開始監看 — 手機日誌服務已連線。請在 App Store 按一次該 App 的雲朵，等雲朵再次出現後停止監看。手動重試若成功，可能開始安裝 App。監看會在啟動後 60 秒內自動停止。")
         case .scanning: return text("Reading the selected log locally. Nothing is uploaded…", "正在本機讀取選定日誌，不會上傳…")
         case .scanned: return text("Scan finished. Results are candidates, not proof that a current restore is stuck. No matches does not mean the phone is healthy or the problem is gone.", "掃描完成。結果是候選項目，不能證明目前仍卡住；沒有匹配也不代表手機正常或問題已解除。")
         case .uninstalling: return text("Submitting one uninstall request for the confirmed device and app. Do not disconnect the phone…", "正在對確認的裝置與 App 提出一筆卸載請求。請勿拔除手機…")
@@ -237,7 +275,7 @@ struct RescueView: View {
 
                 card {
                     sectionTitle("2", model.text("Find matching restore errors", "找出符合條件的回復錯誤"))
-                    Text(model.text("Start monitoring, then try the affected app’s cloud button once. Logs stay in memory; only matching app IDs and counts are shown. You can also import an existing local log.", "先開始監看，再按一次問題 App 的雲朵。日誌只留在記憶體，畫面僅顯示匹配的 App 識別碼與次數。也可以匯入既有的本機日誌。"))
+                    Text(model.text("Start monitoring, wait for “Listening,” then try the affected app’s cloud button once. Logs stay in memory; only matching app IDs and counts are shown. You can also import an existing local log.", "先開始監看，等顯示「已開始監看」，再按一次問題 App 的雲朵。日誌只留在記憶體，畫面僅顯示匹配的 App 識別碼與次數。也可以匯入既有的本機日誌。"))
                         .font(.callout).foregroundStyle(.secondary)
                     HStack {
                         if model.monitoring {
@@ -300,6 +338,8 @@ struct RescueView: View {
         .frame(minWidth: 720, minHeight: 680)
         .onChange(of: model.selectedDevice) { _ in model.invalidateInspection() }
         .onChange(of: model.bundleText) { _ in model.invalidateInspection() }
+        .background(WindowCloseGuard(blocked: model.uninstallInProgress))
+        .onDisappear { if model.monitoring { model.stopMonitoring() } }
         .sheet(item: $model.confirmation) { target in
             UninstallSheet(model: model, target: target)
         }
@@ -317,6 +357,17 @@ struct RescueView: View {
             .padding(18).frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.secondary.opacity(0.12)))
+    }
+}
+
+private struct WindowCloseGuard: NSViewRepresentable {
+    let blocked: Bool
+    func makeNSView(context: Context) -> GuardView { GuardView() }
+    func updateNSView(_ view: GuardView, context: Context) { view.blocked = blocked; view.updateButton() }
+    final class GuardView: NSView {
+        var blocked = false
+        override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); updateButton() }
+        func updateButton() { window?.standardWindowButton(.closeButton)?.isEnabled = !blocked }
     }
 }
 

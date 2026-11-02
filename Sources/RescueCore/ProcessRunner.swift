@@ -4,6 +4,11 @@ import Darwin
 public struct LocalProcessRunner: CommandRunning {
     public init() {}
 
+    /// Called only when the app is actually quitting. Stopping a client cannot roll back an uninstall already sent.
+    public static func shutdownOwnedProcesses() async {
+        await OwnedProcessRegistry.shared.shutdown()
+    }
+
     private func executable(for tool: ToolKind) throws -> URL {
         if tool == .systemLog { return URL(fileURLWithPath: "/usr/bin/log") }
         // Never search arbitrary PATH entries or invoke a shell / package manager.
@@ -44,9 +49,9 @@ public struct LocalProcessRunner: CommandRunning {
         let output = Pipe(), errorOutput = Pipe()
         process.standardOutput = output
         process.standardError = errorOutput
-        let capture = ProcessCapture(limit: command.maximumOutputBytes)
-        do { try process.run() } catch { throw RescueError.launchFailed }
-        cancellation.attach(process)
+        let capture = ProcessCapture(limit: command.maximumOutputBytes, readinessMarker: command.readinessMarker, onReady: command.readinessHandler)
+        do { try OwnedProcessRegistry.shared.launch(process, cancellation: cancellation) } catch { throw RescueError.launchFailed }
+        defer { OwnedProcessRegistry.shared.finished(cancellation) }
 
         let readers = DispatchGroup()
         for (handle, isError) in [(output.fileHandleForReading, false), (errorOutput.fileHandleForReading, true)] {
@@ -85,11 +90,12 @@ public struct LocalProcessRunner: CommandRunning {
         return CommandResult(exitCode: process.terminationStatus,
                              stdout: String(decoding: snapshot.stdout, as: UTF8.self),
                              stderr: String(decoding: snapshot.stderr, as: UTF8.self),
-                             stoppedAsRequested: command.expectedStop && stopped)
+                             stoppedAsRequested: command.expectedStop && stopped,
+                             monitoringStarted: snapshot.ready)
     }
 }
 
-private final class ProcessCancellation: @unchecked Sendable {
+final class ProcessCancellation: @unchecked Sendable {
     private let lock = NSLock()
     private var process: Process?
     private var cancelled = false
@@ -102,6 +108,10 @@ private final class ProcessCancellation: @unchecked Sendable {
         lock.lock(); cancelled = true; let child = process; lock.unlock()
         if let child = child { terminate(child) }
     }
+    func waitUntilExit() {
+        lock.lock(); let child = process; lock.unlock()
+        child?.waitUntilExit()
+    }
     private func terminate(_ process: Process) {
         guard process.isRunning else { return }
         process.terminate()
@@ -111,23 +121,92 @@ private final class ProcessCancellation: @unchecked Sendable {
     }
 }
 
+final class OwnedProcessRegistry: @unchecked Sendable {
+    static let shared = OwnedProcessRegistry()
+    private let lock = NSLock()
+    private var processes: [ObjectIdentifier: ProcessCancellation] = [:]
+    private var shuttingDown = false
+
+    func launch(_ process: Process, cancellation: ProcessCancellation) throws {
+        lock.lock(); defer { lock.unlock() }
+        guard !shuttingDown, !cancellation.isCancelled else { throw RescueError.launchFailed }
+        // Hold the lock across launch so shutdown cannot miss a newly started child.
+        try process.run()
+        cancellation.attach(process)
+        processes[ObjectIdentifier(cancellation)] = cancellation
+    }
+
+    func finished(_ cancellation: ProcessCancellation) {
+        lock.lock(); processes.removeValue(forKey: ObjectIdentifier(cancellation)); lock.unlock()
+    }
+
+    func shutdown() async {
+        let children = beginShutdown()
+        children.forEach { $0.cancel() }
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                children.forEach { $0.waitUntilExit() }
+                continuation.resume()
+            }
+        }
+    }
+
+    private func beginShutdown() -> [ProcessCancellation] {
+        lock.lock(); defer { lock.unlock() }
+        shuttingDown = true
+        return Array(processes.values)
+    }
+}
+
+struct MonitorReadinessDetector {
+    private let expected: String
+    private var line = Data()
+    private var oversizedLine = false
+    private(set) var ready = false
+    init(marker: String) { expected = marker }
+    mutating func append(_ bytes: Data) -> Bool {
+        guard !ready else { return false }
+        for byte in bytes {
+            if byte == 10 {
+                if !oversizedLine, String(decoding: line, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) == expected {
+                    ready = true
+                    return true
+                }
+                line.removeAll(keepingCapacity: true)
+                oversizedLine = false
+            } else if line.count < 4096 { line.append(byte) }
+            else { oversizedLine = true }
+        }
+        return false
+    }
+}
+
 private final class ProcessCapture: @unchecked Sendable {
     private let lock = NSLock()
     private let limit: Int
     private var output = Data(), errorOutput = Data()
     private var overflow = false, timedOut = false
-    init(limit: Int) { self.limit = limit }
+    private var readiness: MonitorReadinessDetector?
+    private let onReady: (@Sendable () -> Void)?
+    init(limit: Int, readinessMarker: String?, onReady: (@Sendable () -> Void)?) {
+        self.limit = limit
+        readiness = readinessMarker.map { MonitorReadinessDetector(marker: $0) }
+        self.onReady = onReady
+    }
     func append(_ data: Data, isError: Bool) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
         let remaining = max(0, limit - output.count - errorOutput.count)
         if data.count > remaining { overflow = true }
         if isError { errorOutput.append(data.prefix(remaining)) }
         else { output.append(data.prefix(remaining)) }
+        let becameReady = !isError && (readiness?.append(data) ?? false)
+        lock.unlock()
+        if becameReady { onReady?() }
         // Continue draining after the limit; never let a full pipe deadlock a child.
     }
     func markTimedOut() { lock.lock(); timedOut = true; lock.unlock() }
-    func snapshot() -> (stdout: Data, stderr: Data, overflow: Bool, timedOut: Bool) {
+    func snapshot() -> (stdout: Data, stderr: Data, overflow: Bool, timedOut: Bool, ready: Bool) {
         lock.lock(); defer { lock.unlock() }
-        return (output, errorOutput, overflow, timedOut)
+        return (output, errorOutput, overflow, timedOut, readiness?.ready ?? false)
     }
 }

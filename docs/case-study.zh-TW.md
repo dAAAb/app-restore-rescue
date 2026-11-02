@@ -53,14 +53,14 @@ PTT 案例包含先嘗試安裝舊 IPA、再移除的做法。我這次採取的
 工具的工作流程是：
 
 1. 以 USB 接上並解鎖 iPhone，核對目標裝置。如果系統要求信任這部電腦，由使用者自行決定並完成。
-2. 選擇開始短時間監看 `appstored`，再到手機的 App Store 手動點一次有問題 App 的下載雲朵，等這次嘗試結束。監看本身只讀取訊息；點下載則可能直接成功安裝。如果已經有包含失敗過程的本機日誌，可以直接匯入，不必再次點擊。
+2. 選擇開始短時間監看 `appstored`，等工具顯示「已開始監看」後，再到手機的 App Store 手動點一次有問題 App 的下載雲朵，等這次嘗試結束。監看本身只讀取訊息；點下載則可能直接成功安裝。如果已經有包含失敗過程的本機日誌，可以直接匯入，不必再次點擊。
 3. 掃描與 `ASDErrorDomain 506`、`Duplicate restoring request` 有關且能關聯到 Bundle ID 的紀錄，列出候選 App。候選代表「這份日誌曾經出現相關錯誤」，不代表「目前仍然故障」。工具不會自動點下載、不會持續在背景收集完整日誌，也不會上傳日誌。
 4. 使用者選擇一個候選 App，先做唯讀檢查。App 清單中查不到項目，也不能單獨當成沒有任何殘留狀態的證據。核對手機與 Bundle ID、閱讀資料刪除提醒後，才明確確認卸載。操作逐一進行，不預設批次刪除。
 5. 完成後，由使用者回到 iPhone 的 App Store 重新下載，親自驗證結果。
 
 日誌檔可能混有其他裝置、歷史錯誤或已修復的事件。即時監看也可能因為時段不對、訊息未輸出或資訊被隱去而抓不到線索。因此「沒有候選項目」不能解讀成「所有 App 都正常」。掃描結果只是排查輔助，無法取代核對目前症狀，也不能保證找出所有換機後尚未完成的 App。若只有一般下載問題，應先依 [Apple 的下載排查步驟](https://support.apple.com/zh-tw/102632)檢查、正常重新啟動並重試；持續失敗時，把已去除識別資訊的錯誤交給 Apple 支援。
 
-App Restore Rescue 沒有遙測，也不把原始日誌或裝置識別資訊放入可分享的摘要。日誌與候選 App 清單仍屬於你的資料，請不要把原始診斷封存檔直接貼到公開 issue。
+App Restore Rescue 沒有遙測。原始日誌只留在本機記憶體，介面會遮蔽裝置識別資訊。日誌與候選 App 清單仍屬於你的資料，請不要把原始診斷封存檔直接貼到公開 issue。
 
 工具需要使用者自行安裝 `ideviceinstaller` 1.2 或更新版本，以及相關裝置連線工具。底層的裝置通訊與卸載能力來自 [libimobiledevice](https://github.com/libimobiledevice/libimobiledevice) 與 [ideviceinstaller](https://github.com/libimobiledevice/ideviceinstaller)，後者是 GPL 授權的獨立專案；這些上游維護者應得到完整的功勞。[ideviceinstaller 的授權檔案](https://github.com/libimobiledevice/ideviceinstaller/blob/1.2.0/COPYING)。
 

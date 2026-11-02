@@ -93,10 +93,10 @@ public actor RescueService {
         return RestoreLogScanner.scan(contents)
     }
 
-    public func monitor(_ device: DeviceIdentifier) async throws -> LogScanResult {
+    public func monitor(_ device: DeviceIdentifier, onReady: (@Sendable () -> Void)? = nil) async throws -> LogScanResult {
         guard try await devices().contains(device) else { throw RescueError.deviceDisconnected }
-        let output = try await runner.run(.monitor(device))
-        guard output.exitCode == 0 || output.stoppedAsRequested else { throw RescueError.serviceUnavailable }
+        let output = try await runner.run(.monitor(device, onReady: onReady))
+        guard output.monitoringStarted, output.exitCode == 0 || output.stoppedAsRequested else { throw RescueError.serviceUnavailable }
         return RestoreLogScanner.scan(output.stdout)
     }
 }

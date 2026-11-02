@@ -38,7 +38,7 @@ The first release is **ad-hoc signed, not Apple Developer ID signed and not nota
 
 1. Open the app and check its dependency status. Nothing is installed automatically.
 2. Connect and unlock the intended iPhone. Refresh the USB device list and explicitly select the device. The interface masks its identifier; disconnect other phones if you cannot confidently distinguish them.
-3. Investigate using an existing local log, or start a short local monitoring session. With monitoring active, **manually press the affected app's cloud-download button once** on the iPhone. That retry may succeed and start installing the app; monitoring itself does not press the button. Stop when the relevant event has been captured. Existing logs do not require another download attempt.
+3. Investigate using an existing local log, or start a short local monitoring session. Wait until the app reports “Listening,” then **manually press the affected app's cloud-download button once** on the iPhone. That retry may succeed and start installing the app; monitoring itself does not press the button. Stop when the relevant event has been captured. Existing logs do not require another download attempt.
 4. Review any candidate app identifier and the matching restore-error evidence. A historical log match is a lead, not proof the problem is still present. A spinning download button by itself is not a diagnosis. You may also enter a bundle identifier that you have independently verified.
 5. Check the selected target. This queries the selected app only, not every installed app. A missing app record does not prove an orphaned restore exists.
 6. If you decide to try removal, review the selected device and bundle identifier, acknowledge local-data loss, and type the exact bundle identifier in the confirmation. Only that one target is submitted. The app does not automatically retry, switch devices, or uninstall a batch.
@@ -76,6 +76,8 @@ ideviceinstaller -u "$DEVICE_UDID" uninstall "$APP_BUNDLE_ID"
 ```
 
 The command does not require a Home Screen icon to exist. Whether the iPhone accepts removal of an app with a missing record depends on its current state. The tool supports older `ideviceinstaller` syntax upstream, but this GUI requires version 1.2+ to keep its invocation contract small and testable.
+
+Validation: the underlying targeted CLI operation succeeded in the original case. The GUI uses synthetic parser fixtures and mock device-service tests; its live-monitoring path has not yet been verified end to end on a physical phone.
 
 ## Development and releases
 
