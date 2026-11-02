@@ -209,6 +209,13 @@ final class RescueModel: ObservableObject {
         }
     }
 
+    var monitoringStatusText: String? {
+        switch status {
+        case .connectingMonitor, .monitoring: return statusText
+        default: return nil
+        }
+    }
+
     private func errorText(_ error: RescueError) -> String {
         switch error {
         case .missingTools: return text("Required tools were not found. Install ideviceinstaller yourself with Homebrew; the app never installs dependencies. Live monitoring also needs idevicesyslog from libimobiledevice.", "找不到必要工具。請自行用 Homebrew 安裝 ideviceinstaller；本工具不會安裝相依元件。即時監看另需 libimobiledevice 提供的 idevicesyslog。")
@@ -285,6 +292,15 @@ struct RescueView: View {
                         }
                         Button(model.text("Import local log…", "匯入本機日誌…"), action: model.importLog).disabled(model.busy)
                     }
+                    if let message = model.monitoringStatusText {
+                        HStack(alignment: .top, spacing: 10) {
+                            ProgressView().controlSize(.small)
+                            Text(message).font(.callout).textSelection(.enabled)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.teal.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                    }
                     if let scan = model.scan {
                         Text(model.text("Matched failures: \(scan.matchingFailureCount) · Unattributed: \(scan.ambiguousFailureCount)", "匹配錯誤：\(scan.matchingFailureCount) · 無法歸屬：\(scan.ambiguousFailureCount)"))
                             .font(.caption).foregroundStyle(.secondary)
@@ -331,7 +347,7 @@ struct RescueView: View {
                     Text(model.statusText).font(.callout).textSelection(.enabled)
                 }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.accentColor.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-                Text(model.text("Independent open-source utility. Not affiliated with Apple or any app developer. Raw logs, device identifiers, account details, and file paths are never included in a public report.", "獨立開源工具，與 Apple 或 App 開發者無隸屬關係。公開報告不包含原始日誌、裝置識別碼、帳號資訊或檔案路徑。"))
+                Text(model.text("Independent open-source utility. Not affiliated with Apple or any app developer. The app does not upload diagnostics or save raw captures or full device identifiers.", "獨立開源工具，與 Apple 或 App 開發者無隸屬關係。不會上傳診斷資料，也不會另存原始監看內容或完整裝置識別碼。"))
                     .font(.caption).foregroundStyle(.secondary)
             }.padding(28)
         }
