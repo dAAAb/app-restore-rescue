@@ -1,0 +1,32 @@
+name: Bug report
+description: Report a problem using a minimal, sanitized description.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach raw phone logs, .logarchive files, screenshots with identifiers, pairing records, Apple IDs, serial numbers, or device UDIDs. A short error category and reproduction steps are enough to start. Use GitHub private vulnerability reporting for security issues when it is enabled; do not disclose sensitive details in a public issue.
+  - type: input
+    id: version
+    attributes:
+      label: App Restore Rescue version
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: macOS version and Mac architecture
+      placeholder: macOS version, Apple silicon or Intel (no serial number)
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and observed behavior
+      description: Describe the selected action and a sanitized error category. Do not paste raw tool output.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy review
+      options:
+        - label: I removed personal/device identifiers and did not attach raw diagnostic data.
+          required: true

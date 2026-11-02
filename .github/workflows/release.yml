@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - run: python3 scripts/privacy_audit.py
+      - run: python3 -m unittest discover -s scripts/tests -v
+      - run: bash -n scripts/build-release.sh
+      - run: swift test
+
+  release:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: macos-15
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Build and verify universal app bundle
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          bash scripts/build-release.sh "${RELEASE_TAG#v}"
+      - name: Create draft release for maintainer review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          cat > .build/release-notes.md <<'NOTES'
+          Download the macOS universal ZIP (Apple silicon and Intel), plus SHA256SUMS.txt.
+
+          This app requires macOS 13+ and a separately installed ideviceinstaller 1.2+.
+          It does not install dependencies, automatically export phone logs, upload diagnostics, or install iPhone apps. Optional local monitoring runs only when you start it; an existing local log can also be analyzed.
+          Checking is the default; uninstalling one selected app requires explicit confirmation and can delete its local data.
+
+          The app is ad-hoc signed, NOT Apple Developer ID signed or notarized. Read the README and verify the download before choosing whether to open it. Never disable Gatekeeper globally.
+
+          中文：下載通用版 ZIP，支援 Apple silicon 與 Intel Mac。需要 macOS 13+，並自行安裝 ideviceinstaller 1.2+。
+          預設只檢查；卸載單一 App 前必須明確確認，且可能刪除該 App 的本機資料。本工具不會自動安裝元件、自動匯出手機日誌或上傳診斷資料。只有你啟動時才進行本機監看，也可分析已有的本機日誌。
+          此版本僅有 ad-hoc 簽章，未經 Apple Developer ID 簽署或公證。請先閱讀 README、核對下載檔，再決定是否開啟；請勿全域停用 Gatekeeper。
+          NOTES
+          gh release create "$RELEASE_TAG" \
+            "dist/AppRestoreRescue-${RELEASE_TAG}-macOS-universal.zip" \
+            dist/SHA256SUMS.txt \
+            --draft \
+            --verify-tag \
+            --title "App Restore Rescue ${RELEASE_TAG}" \
+            --notes-file .build/release-notes.md
