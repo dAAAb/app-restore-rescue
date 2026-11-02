@@ -53,12 +53,14 @@ jobs:
           Download the macOS universal ZIP (Apple silicon and Intel), plus SHA256SUMS.txt.
 
           This app requires macOS 13+ and a separately installed ideviceinstaller 1.2+.
+          The interface follows macOS language preferences: English, Japanese, Korean, or Traditional Chinese. The ZIP includes all four README translations.
           It does not install dependencies, automatically export phone logs, upload diagnostics, or install iPhone apps. Optional local monitoring runs only when you start it; an existing local log can also be analyzed.
           Checking is the default; uninstalling one selected app requires explicit confirmation and can delete its local data.
 
           The app is ad-hoc signed, NOT Apple Developer ID signed or notarized. Read the README and verify the download before choosing whether to open it. Never disable Gatekeeper globally.
 
           中文：下載通用版 ZIP，支援 Apple silicon 與 Intel Mac。需要 macOS 13+，並自行安裝 ideviceinstaller 1.2+。
+          介面依 macOS 語言偏好自動選用英文、日文、韓文或繁體中文；下載包包含四種語言的 README。
           預設只檢查；卸載單一 App 前必須明確確認，且可能刪除該 App 的本機資料。本工具不會自動安裝元件、自動匯出手機日誌或上傳診斷資料。只有你啟動時才進行本機監看，也可分析已有的本機日誌。
           此版本僅有 ad-hoc 簽章，未經 Apple Developer ID 簽署或公證。請先閱讀 README、核對下載檔，再決定是否開啟；請勿全域停用 Gatekeeper。
           NOTES

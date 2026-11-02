@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SKIP_DIRS = {".git", ".build", ".swiftpm", "dist", "__pycache__"}
 ALLOWED_TOP = {
     ".github", "scripts", "Sources", "Tests", "docs", "Package.swift",
-    "Package.resolved", "README.md", "README.zh-TW.md", "PRIVACY.md",
+    "Package.resolved", "README.md", "README.ja.md", "README.ko.md", "README.zh-TW.md", "PRIVACY.md",
     "SECURITY.md", "LICENSE", ".gitignore",
 }
 FORBIDDEN_SUFFIXES = {

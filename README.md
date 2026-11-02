@@ -1,12 +1,14 @@
 # App Restore Rescue
 
-[繁體中文](README.zh-TW.md) · [Download a release](https://github.com/dAAAb/app-restore-rescue/releases/latest) · [Privacy](PRIVACY.md)
+[English](README.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [繁體中文](README.zh-TW.md)
+
+[Download a release](https://github.com/dAAAb/app-restore-rescue/releases/latest) · [Privacy](PRIVACY.md)
 
 A small, open-source macOS utility for investigating iPhone apps stuck after migration, and requesting the removal of **one explicitly selected app on one explicitly selected USB device**.
 
 It was created after an app disappeared from both the Home Screen and the iPhone app list, while App Store redownload requests failed with `ASDErrorDomain Code=506`, `Duplicate restoring request`. A targeted uninstall request completed, and the user could then download the app normally. That is one confirmed recovery, not a guarantee for every download failure.
 
-**Uninstalling can delete the selected app's local documents, drafts, and other unsynced data.** This is an uninstall tool with safeguards, not a data-preserving cache cleaner or a general iPhone repair program.
+**Uninstalling can permanently delete the selected app's local documents, drafts, and other unsynced data.** This is an uninstall tool with safeguards, not a data-preserving cache cleaner or a general iPhone repair program.
 
 ## Download and requirements
 
@@ -28,7 +30,7 @@ Download `AppRestoreRescue-vX.Y.Z-macOS-universal.zip` and `SHA256SUMS.txt` from
 shasum -a 256 -c SHA256SUMS.txt
 ```
 
-The ZIP contains a universal `.app`, this documentation, the license, privacy information, and a build revision. The third-party device tools are **not bundled**.
+The ZIP contains a universal `.app`, all four README translations, the license, privacy information, and a build revision. The third-party device tools are **not bundled**.
 
 ### macOS security prompt
 
@@ -44,7 +46,9 @@ The first release is **ad-hoc signed, not Apple Developer ID signed and not nota
 6. If you decide to try removal, review the selected device and bundle identifier, acknowledge local-data loss, and type the exact bundle identifier in the confirmation. Only that one target is submitted. The app does not automatically retry, switch devices, or uninstall a batch.
 7. After a successful uninstall result, return to the iPhone's App Store and redownload the app yourself. **Only a successful redownload confirms the original symptom is resolved.**
 
-The interface supports English and Traditional Chinese. X's known bundle identifier is `com.atebits.Tweetie2`, as published in [X's own associated-domain file](https://x.com/.well-known/apple-app-site-association). Do not guess another app's identifier from its display name.
+The interface automatically follows macOS language preferences and supports English, Japanese, Korean, and Traditional Chinese (`en`, `ja`, `ko`, `zh-Hant`). macOS chooses the best supported language in your preference order, including an app-specific language preference if configured. If none matches, the app uses English. There is no in-app language selector; quit and reopen the app after changing the macOS language setting.
+
+X's known bundle identifier is `com.atebits.Tweetie2`, as published in [X's own associated-domain file](https://x.com/.well-known/apple-app-site-association). Do not guess another app's identifier from its display name.
 
 ## What it can and cannot establish
 

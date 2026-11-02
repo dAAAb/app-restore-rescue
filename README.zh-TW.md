@@ -1,12 +1,14 @@
 # App Restore Rescue
 
-[English](README.md) · [下載 Release](https://github.com/dAAAb/app-restore-rescue/releases/latest) · [隱私說明](PRIVACY.md)
+[English](README.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [繁體中文](README.zh-TW.md)
+
+[下載 Release](https://github.com/dAAAb/app-restore-rescue/releases/latest) · [隱私說明](PRIVACY.md)
 
 一個開源 macOS 小工具，協助調查 iPhone 移轉後 App 卡住的情況，並在明確確認後，**只對選定的一支 USB 裝置、選定的一個 App 提出卸載請求**。
 
 起因是一個真實案例：換機後找不到 App，App Store 的雲朵下載按鈕轉一下就恢復原狀。日誌顯示 `ASDErrorDomain Code=506`、`Duplicate restoring request`。針對該 App 提出卸載請求並完成後，使用者成功重新下載。這是一個已確認成功的案例，不代表所有下載失敗都能用相同方法修復。
 
-**卸載可能刪除該 App 的本機文件、草稿及尚未同步的資料。** 本工具提供有確認步驟的卸載操作，不能保證保留 App 資料，也不是通用 iPhone 修復程式。
+**卸載可能永久刪除該 App 的本機文件、草稿及尚未同步的資料。** 本工具提供有確認步驟的卸載操作，不能保證保留 App 資料，也不是通用 iPhone 修復程式。
 
 ## 下載與需求
 
@@ -28,7 +30,7 @@ Homebrew 會處理 `libimobiledevice`、`libplist`、`libzip` 等相依套件；
 shasum -a 256 -c SHA256SUMS.txt
 ```
 
-ZIP 包含通用版 `.app`、中英說明、授權、隱私說明及公開版本資訊。**沒有附帶第三方裝置工具的執行檔**。
+ZIP 包含通用版 `.app`、四種語言的 README、授權、隱私說明及公開版本資訊。**沒有附帶第三方裝置工具的執行檔**。
 
 ### macOS 的安全性提示
 
@@ -44,7 +46,9 @@ ZIP 包含通用版 `.app`、中英說明、授權、隱私說明及公開版本
 6. 若決定嘗試移除，先核對裝置與 Bundle ID、確認了解本機資料可能被刪除，再輸入完整 Bundle ID 進行確認。工具只送出這一筆請求，不會自動重試、改選其他裝置或批次卸載。
 7. 收到卸載完成結果後，回到 iPhone 的 App Store 自行重新下載。**只有重新下載成功，才能確認原本的問題已解除。**
 
-介面支援繁體中文與英文。X 的 Bundle ID 是 `com.atebits.Tweetie2`，可由 [X 官方網站關聯設定](https://x.com/.well-known/apple-app-site-association)確認。其他 App 請先核實識別碼，不要從顯示名稱猜測。
+介面會自動跟隨 macOS 語言偏好，支援英文、日文、韓文及繁體中文（`en`、`ja`、`ko`、`zh-Hant`）。macOS 會依偏好順序選擇可支援的語言，也會採用你另外設定的個別 App 語言；沒有匹配語言時使用英文。App 內不提供手動語言選單；變更 macOS 語言設定後，請結束並重新開啟工具。
+
+X 的 Bundle ID 是 `com.atebits.Tweetie2`，可由 [X 官方網站關聯設定](https://x.com/.well-known/apple-app-site-association)確認。其他 App 請先核實識別碼，不要從顯示名稱猜測。
 
 ## 工具能做與不能保證的事
 

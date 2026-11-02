@@ -37,6 +37,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleDevelopmentRegion</key><string>en</string>
+<key>CFBundleLocalizations</key><array><string>en</string><string>ja</string><string>ko</string><string>zh-Hant</string></array>
 <key>CFBundleExecutable</key><string>AppRestoreRescue</string>
 <key>CFBundleIdentifier</key><string>com.daaab.AppRestoreRescue</string>
 <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
@@ -61,7 +62,7 @@ swift scripts/make-icon.swift "$project_root/.build/AppIcon.iconset"
 /usr/bin/codesign --verify --strict --verbose=2 "$app"
 /usr/bin/lipo "$app/Contents/MacOS/AppRestoreRescue" -verify_arch arm64 x86_64
 
-cp README.md README.zh-TW.md LICENSE PRIVACY.md "$stage/"
+cp README.md README.ja.md README.ko.md README.zh-TW.md LICENSE PRIVACY.md "$stage/"
 commit="${GITHUB_SHA:-local-build}"
 if [[ "$commit" != local-build && ! "$commit" =~ ^[0-9a-fA-F]{40}$ ]]; then
   printf '%s\n' 'Unexpected source revision format.' >&2

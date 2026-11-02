@@ -9,7 +9,7 @@ from pathlib import Path
 import sys
 import zipfile
 
-STANDALONE = {"README.md", "README.zh-TW.md", "LICENSE", "PRIVACY.md", "BUILD-INFO.txt"}
+STANDALONE = {"README.md", "README.ja.md", "README.ko.md", "README.zh-TW.md", "LICENSE", "PRIVACY.md", "BUILD-INFO.txt"}
 BUNDLE = {
     "AppRestoreRescue.app/Contents/Info.plist",
     "AppRestoreRescue.app/Contents/PkgInfo",
